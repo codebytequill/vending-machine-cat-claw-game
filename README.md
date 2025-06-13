@@ -1,4 +1,5 @@
 Vending Machine Cat Claw! ネコキャッチャー自動販売機
+
 Welcome to the Vending Machine Cat Claw game! This is a simple and cute web-based game built into a single HTML file. Enjoy the thrill of a classic Japanese vending machine and test your luck with an adorable cat-themed claw machine.
 
 Features
