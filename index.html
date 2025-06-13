@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vending Machine Cat Claw!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            touch-action: manipulation; /* Prevents double tap to zoom on mobile */
+        }
+
+        .font-mochiy {
+            font-family: 'Mochiy Pop One', sans-serif;
+        }
+
+        /* Vending machine glass effect */
+        .glass-panel {
+            background: rgba(210, 228, 255, 0.4);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+
+        /* Button styles */
+        .vending-button {
+            transition: all 0.1s ease-out;
+            box-shadow: 0 4px 0 #9ca3af; /* gray-400 */
+        }
+        .vending-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #9ca3af;
+        }
+        .vending-button.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: translateY(0);
+            box-shadow: 0 4px 0 #9ca3af;
+        }
+
+        /* Claw machine styles */
+        .claw-game-area {
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g fill="%23dbeafe" fill-opacity="0.8"><rect x="50" width="50" height="50" /><rect y="50" width="50" height="50" /></g></svg>');
+            background-size: 20px 20px;
+        }
+        #claw {
+            transition: all 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            will-change: transform;
+        }
+        #claw-arm {
+            transition: height 0.5s ease-in-out;
+            will-change: height;
+        }
+
+        /* Animations */
+        @keyframes dispense-item {
+            0% { transform: translateY(-100px); opacity: 0; }
+            50% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(50px) scale(0.8); opacity: 0; }
+        }
+        .dispense-animation {
+            animation: dispense-item 1.5s ease-in-out forwards;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .shake-animation {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Cat SVG styles */
+        .cat-svg {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2));
+            transition: transform 0.3s ease;
+        }
+        .cat-svg:hover {
+            transform: scale(1.1);
+        }
+
+    </style>
+</head>
+<body class="bg-blue-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Left Column: Vending Machine -->
+        <div class="lg:col-span-2 bg-red-500 rounded-3xl p-4 sm:p-6 border-4 border-red-700 shadow-2xl">
+            <div class="bg-white/80 rounded-2xl p-4">
+                <h1 class="font-mochiy text-2xl sm:text-4xl text-center text-red-600 mb-4">ネコキャッチャー自動販売機</h1>
+                <h2 class="text-center text-gray-600 -mt-3 mb-4">(Neko Cat-cher Vending Machine)</h2>
+
+                <!-- Vending Items Grid -->
+                <div id="vending-items-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-4 glass-panel rounded-xl p-4">
+                    <!-- Vending items will be generated here by JavaScript -->
+                </div>
+
+                <!-- Dispenser & UI -->
+                <div class="mt-4 grid grid-cols-3 gap-4 items-center">
+                    <div class="bg-gray-800 rounded-lg p-2 sm:p-4 text-white col-span-2">
+                         <div class="flex justify-between items-center text-lg sm:text-2xl">
+                            <span class="font-bold">CASH:</span>
+                            <span id="currency-display" class="font-mochiy text-yellow-300">¥1000</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2 text-lg sm:text-2xl">
+                            <span class="font-bold">CLAW:</span>
+                            <span id="claw-tokens-display" class="font-mochiy text-pink-400">x 0</span>
+                        </div>
+                    </div>
+                    <div id="dispenser-slot" class="h-24 bg-gray-900 rounded-lg border-2 border-gray-500 flex items-center justify-center relative overflow-hidden">
+                        <div class="text-gray-500 text-sm">PUSH</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Claw Machine & Cat Collection -->
+        <div class="space-y-8">
+            <!-- Claw Machine -->
+            <div class="bg-blue-400 rounded-3xl p-4 border-4 border-blue-600 shadow-2xl">
+                <div class="bg-white/80 rounded-2xl p-4">
+                    <h2 class="font-mochiy text-2xl text-center text-blue-600 mb-2">CLAW GAME</h2>
+                    <div id="claw-game-area" class="claw-game-area w-full h-64 bg-blue-100 rounded-lg border-4 border-blue-300 relative overflow-hidden">
+                        <!-- Claw Mechanism -->
+                        <div id="claw" class="absolute top-0 left-0 w-12 h-auto" style="transform: translateX(0px);">
+                            <div id="claw-arm" class="w-2 h-8 bg-gray-500 mx-auto rounded-b-md"></div>
+                            <div id="claw-hand" class="w-12 h-8 flex justify-center items-end">
+                                <div class="w-3 h-6 bg-gray-600 rounded-t-full -mr-1 transform -rotate-45"></div>
+                                <div class="w-3 h-6 bg-gray-600 rounded-t-full transform rotate-45"></div>
+                            </div>
+                        </div>
+                        <!-- Prizes -->
+                        <div id="prize-area" class="absolute bottom-2 left-0 right-0 h-16 flex justify-around items-end">
+                            <!-- Cats will be placed here -->
+                        </div>
+                    </div>
+                    <button id="claw-button" class="w-full mt-4 bg-pink-500 text-white font-bold py-3 rounded-lg text-xl vending-button border-b-4 border-pink-700">
+                        USE TOKEN (COST: 1)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cat Collection -->
+            <div class="bg-green-400 rounded-3xl p-4 border-4 border-green-600 shadow-2xl">
+                 <div class="bg-white/80 rounded-2xl p-4">
+                    <h2 class="font-mochiy text-2xl text-center text-green-600 mb-3">YOUR CATS</h2>
+                    <div id="cat-collection-grid" class="grid grid-cols-4 gap-2 bg-green-100/70 p-2 rounded-lg min-h-[80px]">
+                        <!-- Collected cats will appear here -->
+                    </div>
+                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Message Modal -->
+    <div id="message-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div id="message-box" class="bg-white rounded-2xl p-8 text-center shadow-lg transform transition-transform duration-300 scale-95">
+            <p id="message-text" class="text-2xl font-bold"></p>
+        </div>
+    </div>
+
+
+    <script>
+    // --- GAME SETUP & STATE ---
+    
+    // DOM Elements
+    const currencyDisplay = document.getElementById('currency-display');
+    const clawTokensDisplay = document.getElementById('claw-tokens-display');
+    const vendingItemsGrid = document.getElementById('vending-items-grid');
+    const dispenserSlot = document.getElementById('dispenser-slot');
+    const catCollectionGrid = document.getElementById('cat-collection-grid');
+    const clawButton = document.getElementById('claw-button');
+    const claw = document.getElementById('claw');
+    const clawArm = document.getElementById('claw-arm');
+    const prizeArea = document.getElementById('prize-area');
+    const messageModal = document.getElementById('message-modal');
+    const messageBox = document.getElementById('message-box');
+    const messageText = document.getElementById('message-text');
+
+    // Game State
+    let gameState = {
+        currency: 1000,
+        clawTokens: 1,
+        collectedCats: [],
+        gameLocked: false, // Prevents multiple actions at once
+    };
+
+    // --- DATA ---
+
+    const VENDING_ITEMS = [
+        { id: 'tea', name: 'Green Tea', price: 100, image: '🍵' },
+        { id: 'coffee', name: 'Canned Coffee', price: 120, image: '☕' },
+        { id: 'soda', name: 'Soda Pop', price: 110, image: '🥤' },
+        { id: 'water', name: 'Water', price: 90, image: '💧' },
+        { id: 'juice', name: 'Juice Box', price: 130, image: '🧃' },
+        { id: 'ramen', name: 'Instant Ramen', price: 250, image: '🍜' },
+        { id: 'onigiri', name: 'Onigiri', price: 180, image: '🍙' },
+        { id: 'token', name: 'Claw Token!', price: 300, image: '🎟️' }
+    ];
+
+    const CATS = [
+        { id: 'calico', name: 'Calico Cat', color: '#E0C9A6', svg: `<svg viewBox="0 0 100 100"><path fill="#FFF" d="M20,80 C20,40 80,40 80,80 Z"/><path fill="#E0C9A6" d="M30,70 C30,50 70,50 70,70 Z"/><path fill="#6d4c41" d="M40,60 C40,55 60,55 60,60 Z M45,45 a5,5 0 0,1 10,0 a5,5 0 0,1 -10,0 Z M35,35 L40,30 L30,20 Z M65,35 L60,30 L70,20 Z"/></svg>` },
+        { id: 'black', name: 'Black Cat', color: '#424242', svg: `<svg viewBox="0 0 100 100"><path fill="#424242" d="M20,80 C20,40 80,40 80,80 Z"/><path fill="#FFF" d="M45,45 a5,5 0 0,1 10,0 a5,5 0 0,1 -10,0 Z M35,35 L40,30 L30,20 Z M65,35 L60,30 L70,20 Z"/><path fill="#f8bbd0" d="M48,60 L52,60 L50,65 Z"/></svg>` },
+        { id: 'orange', name: 'Orange Tabby', color: '#ffb74d', svg: `<svg viewBox="0 0 100 100"><path fill="#ffb74d" d="M20,80 C20,40 80,40 80,80 Z"/><path fill="#FFF" d="M45,45 a5,5 0 0,1 10,0 a5,5 0 0,1 -10,0 Z"/><path fill="#e65100" d="M25,75 L75,75 M28,70 L72,70 M32,65 L68,65"/><path fill="#000" d="M35,35 L40,30 L30,20 Z M65,35 L60,30 L70,20 Z"/></svg>` },
+        { id: 'siamese', name: 'Siamese Cat', color: '#fff8e1', svg: `<svg viewBox="0 0 100 100"><path fill="#fff8e1" d="M20,80 C20,40 80,40 80,80 Z"/><path fill="#6d4c41" d="M45,45 a5,5 0 0,1 10,0 a5,5 0 0,1 -10,0 Z M35,35 L40,30 L30,20 Z M65,35 L60,30 L70,20 Z M48,58 L52,58 L50,63 Z M18,75 C25,60 35,60 40,75 Z M82,75 C75,60 65,60 60,75 Z "/></svg>`}
+    ];
+
+    // --- UI RENDERING ---
+
+    function renderUI() {
+        // Update displays
+        currencyDisplay.textContent = `¥${gameState.currency}`;
+        clawTokensDisplay.textContent = `x ${gameState.clawTokens}`;
+
+        // Update vending machine button states
+        const buttons = document.querySelectorAll('.vending-button');
+        buttons.forEach(button => {
+            const price = parseInt(button.dataset.price);
+            if (price > gameState.currency || gameState.gameLocked) {
+                button.classList.add('disabled');
+            } else {
+                button.classList.remove('disabled');
+            }
+        });
+        
+        // Update claw machine button
+        if (gameState.clawTokens > 0 && !gameState.gameLocked) {
+            clawButton.classList.remove('disabled');
+            clawButton.innerHTML = `USE TOKEN (HAVE: ${gameState.clawTokens})`;
+        } else {
+            clawButton.classList.add('disabled');
+            clawButton.innerHTML = gameState.gameLocked ? 'GAME IN PROGRESS' : 'GET A TOKEN!';
+        }
+
+        // Render collected cats
+        catCollectionGrid.innerHTML = '';
+        const uniqueCollectedCats = [...new Set(gameState.collectedCats.map(cat => cat.id))].map(id => gameState.collectedCats.find(cat => cat.id === id));
+        
+        CATS.forEach(cat => {
+            const isCollected = uniqueCollectedCats.some(collected => collected.id === cat.id);
+            const catDiv = document.createElement('div');
+            catDiv.className = `w-16 h-16 p-1 rounded-lg flex items-center justify-center transition-all duration-300 ${isCollected ? 'bg-green-200' : 'bg-gray-200'}`;
+            const catImg = document.createElement('div');
+            catImg.className = 'w-full h-full cat-svg';
+            catImg.innerHTML = cat.svg;
+            catImg.style.opacity = isCollected ? '1' : '0.2';
+            catDiv.appendChild(catImg);
+            catCollectionGrid.appendChild(catDiv);
+        });
+    }
+
+    // --- GAME LOGIC ---
+
+    function buyItem(item) {
+        if (gameState.gameLocked || gameState.currency < item.price) {
+            if (!gameState.gameLocked) {
+                showMessage('Not enough cash!', 'bg-red-500');
+                currencyDisplay.parentElement.parentElement.classList.add('shake-animation');
+                setTimeout(() => currencyDisplay.parentElement.parentElement.classList.remove('shake-animation'), 500);
+            }
+            return;
+        }
+
+        gameState.gameLocked = true;
+        gameState.currency -= item.price;
+        
+        // Dispense animation
+        const dispensedItem = document.createElement('div');
+        dispensedItem.className = 'absolute text-5xl dispense-animation';
+        dispensedItem.textContent = item.image;
+        dispenserSlot.appendChild(dispensedItem);
+
+        setTimeout(() => {
+            if (item.id === 'token') {
+                gameState.clawTokens++;
+                showMessage('You got a claw token!', 'bg-pink-400');
+            } else {
+                showMessage(`Enjoy your ${item.name}!`, 'bg-blue-400');
+            }
+            
+            dispenserSlot.innerHTML = '<div class="text-gray-500 text-sm">PUSH</div>'; // Clean up
+            gameState.gameLocked = false;
+            renderUI();
+        }, 1500);
+
+        renderUI();
+    }
+    
+    // --- CLAW MACHINE LOGIC ---
+    let clawAnimation;
+    let clawPosition = 0;
+    let clawDirection = 1;
+
+    function moveClaw() {
+        const gameAreaWidth = prizeArea.offsetWidth;
+        const clawWidth = claw.offsetWidth;
+        
+        clawPosition += 2 * clawDirection;
+
+        if (clawPosition > gameAreaWidth - clawWidth || clawPosition < 0) {
+            clawDirection *= -1; // Reverse direction
+        }
+        
+        claw.style.transform = `translateX(${clawPosition}px)`;
+        clawAnimation = requestAnimationFrame(moveClaw);
+    }
+    
+    function startClawGame() {
+        if (gameState.gameLocked || gameState.clawTokens < 1) {
+            return;
+        }
+        
+        gameState.gameLocked = true;
+        gameState.clawTokens--;
+        renderUI();
+        
+        clawButton.innerHTML = 'DROPPING...';
+        clawButton.classList.add('disabled');
+        
+        moveClaw();
+        
+        clawButton.onclick = dropClaw; // Temporarily change function
+    }
+    
+    function dropClaw() {
+        cancelAnimationFrame(clawAnimation);
+        clawButton.onclick = null; // Prevent multiple drops
+        
+        // Animate claw down
+        clawArm.style.height = '120px';
+        
+        setTimeout(() => {
+            // Check for win
+            checkForWin();
+            
+            // Animate claw up
+            clawArm.style.height = '32px';
+
+            setTimeout(() => {
+                // Reset game state
+                gameState.gameLocked = false;
+                clawButton.innerHTML = `USE TOKEN (HAVE: ${gameState.clawTokens})`;
+                clawButton.onclick = startClawGame; // Restore original function
+                renderUI();
+            }, 1000);
+
+        }, 1000);
+    }
+    
+    function checkForWin() {
+        const prizeElements = prizeArea.children;
+        let caughtCat = null;
+
+        for (let i = 0; i < prizeElements.length; i++) {
+            const prize = prizeElements[i];
+            const prizeRect = prize.getBoundingClientRect();
+            const clawRect = claw.getBoundingClientRect();
+
+            // Simple collision detection
+            if (clawRect.left < prizeRect.right && clawRect.right > prizeRect.left) {
+                // Claw is above a prize. Now, let's use some luck!
+                const isLucky = Math.random() < 0.6; // 60% chance of success
+                if(isLucky) {
+                    caughtCat = CATS[i]; // Assuming prize order matches CATS array
+                    break;
+                }
+            }
+        }
+
+        if (caughtCat) {
+            showMessage(`You caught a ${caughtCat.name}!`, 'bg-green-500');
+            gameState.collectedCats.push(caughtCat);
+            const prizeElement = prizeArea.children[CATS.indexOf(caughtCat)];
+            prizeElement.style.opacity = '0';
+            setTimeout(() => prizeElement.style.opacity = '1', 2000); // Reappear after a while
+        } else {
+            showMessage('Oh no, it slipped away!', 'bg-yellow-500');
+        }
+    }
+
+
+    // --- UTILITY FUNCTIONS ---
+    
+    function showMessage(text, bgColorClass) {
+        messageText.textContent = text;
+        messageBox.className = `bg-white rounded-2xl p-6 sm:p-8 text-center text-white shadow-lg transform transition-transform duration-300 scale-95 ${bgColorClass}`;
+        
+        messageModal.classList.remove('hidden');
+        setTimeout(() => messageBox.classList.replace('scale-95', 'scale-100'), 10);
+        
+        setTimeout(() => {
+            messageBox.classList.replace('scale-100', 'scale-95');
+            setTimeout(() => messageModal.classList.add('hidden'), 300);
+        }, 2000);
+    }
+    
+    // --- INITIALIZATION ---
+    function init() {
+        // Create vending machine items
+        VENDING_ITEMS.forEach(item => {
+            const button = document.createElement('button');
+            button.className = 'vending-button bg-gray-200 rounded-lg p-2 flex flex-col items-center justify-center';
+            button.dataset.price = item.price;
+            
+            button.innerHTML = `
+                <div class="text-4xl sm:text-5xl">${item.image}</div>
+                <div class="font-semibold text-gray-800 text-sm sm:text-base">${item.name}</div>
+                <div class="font-mochiy text-red-500 text-lg sm:text-xl">¥${item.price}</div>
+            `;
+            
+            button.onclick = () => buyItem(item);
+            vendingItemsGrid.appendChild(button);
+        });
+        
+        // Place cats in the claw machine
+        CATS.forEach(cat => {
+            const prizeDiv = document.createElement('div');
+            prizeDiv.className = 'w-16 h-16 transition-opacity duration-500';
+            prizeDiv.innerHTML = cat.svg;
+            prizeArea.appendChild(prizeDiv);
+        });
+        
+        // Setup initial claw button event
+        clawButton.onclick = startClawGame;
+        
+        // Initial render
+        renderUI();
+    }
+
+    // Start the game when the window loads
+    window.onload = init;
+
+    </script>
+</body>
+</html>
